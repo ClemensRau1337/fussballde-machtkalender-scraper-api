@@ -98,3 +98,12 @@ compose-up:
 .PHONY: compose-down
 compose-down:
 	docker compose down
+
+.PHONY: tag
+tag:
+	@if [ -z "$$V" ]; then echo "Usage: make tag V=0.0.1"; exit 1; fi
+	git add -A
+	git commit -m "chore: prepare v$$V" || true
+	git tag -a v$$V -m "Release v$$V"
+	git push origin HEAD
+	git push origin v$$V
