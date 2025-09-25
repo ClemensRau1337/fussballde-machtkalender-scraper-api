@@ -1,0 +1,37 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Virtual envs
+.venv/
+venv/
+.venv*/
+venv*/
+
+# Cache / build artifacts
+.cache_fussballde/
+.cache/
+dist/
+build/
+*.egg-info/
+
+# IDE / OS
+*.swp
+.DS_Store
+.idea/
+.vscode/
+.python-version
+
+# Env / secrets
+.env
+.env.local
+.env.*.local

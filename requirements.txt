@@ -1,0 +1,6 @@
+fastapi==0.112.1
+uvicorn[standard]==0.30.6
+requests==2.32.3
+beautifulsoup4==4.12.3
+pydantic==2.9.1
+fonttools==4.53.1
