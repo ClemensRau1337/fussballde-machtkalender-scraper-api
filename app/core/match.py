@@ -1,24 +1,38 @@
 import json
 import re
+from datetime import datetime
 from typing import Dict, Optional
 import unicodedata
 from bs4 import BeautifulSoup
 from ..config import BASE, REQUEST_TIMEOUT, USE_CACHE_DEFAULT, CACHE_DIR
-from .http import get_text, temp_headers, SESSION
-from .utils import cache_path_for, abs_url, _text_or_none, game_id_IN_URL, STAFFEL_LINK_IN_HTML
+from .http import get_text, temp_headers
+from .utils import (
+    cache_path_for,
+    abs_url,
+    _text_or_none,
+    game_id_IN_URL,
+    STAFFEL_LINK_IN_HTML,
+)
 from .obfuscation import _collect_obfuscation_maps_for_page, decode_all_obf_in
-from datetime import datetime
 
 _TIME_RX = re.compile(r"\b([0-2]\d:[0-5]\d)\b")
 _DATE_RX = re.compile(r"\b([0-3]\d\.[01]\d\.\d{2,4})\b")
-_ISO_RX  = re.compile(r"\b\d{4}-\d{2}-\d{2}T[0-2]\d:[0-5]\d(?::\d{2})?(?:Z|[+-][0-2]\d:[0-5]\d)?\b")
-WEEKDAY_RX = re.compile(r"^\s*(?:Mo|Di|Mi|Do|Fr|Sa|So|Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag)\s*,\s*", re.I)
+_ISO_RX = re.compile(
+    r"\b\d{4}-\d{2}-\d{2}T[0-2]\d:[0-5]\d(?::\d{2})?(?:Z|[+-][0-2]\d:[0-5]\d)?\b"
+)
+WEEKDAY_RX = re.compile(
+    r"^\s*(?:Mo|Di|Mi|Do|Fr|Sa|So|Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag)\s*,\s*",
+    re.I,
+)
 ZWSP_RX = re.compile(r"[\u200b-\u200f\uFEFF]")
 
-def _normalize_date_time_fields(d: Dict[str, Optional[str]]) -> Dict[str, Optional[str]]:
-    raw_time = (d.get("time") or "")
+
+def _normalize_date_time_fields(
+    d: Dict[str, Optional[str]],
+) -> Dict[str, Optional[str]]:
+    raw_time = d.get("time") or ""
     raw_time = unicodedata.normalize("NFKC", raw_time)
-    raw_time = raw_time.replace("\u00A0", " ").replace("\u202F", " ")
+    raw_time = raw_time.replace("\u00a0", " ").replace("\u202f", " ")
     raw_time = ZWSP_RX.sub("", raw_time).strip()
 
     m_iso = _ISO_RX.search(raw_time)
@@ -50,14 +64,16 @@ def _normalize_date_time_fields(d: Dict[str, Optional[str]]) -> Dict[str, Option
 
     return d
 
+
 ED_VARS = {
-    "home":            r"edHeimmannschaftName='([^']+)'",
-    "away":            r"edGastmannschaftName='([^']+)'",
-    "age_group":       r"edMannschaftsartName='([^']+)'",
-    "league":          r"edSpielklasseName='([^']+)'",
+    "home": r"edHeimmannschaftName='([^']+)'",
+    "away": r"edGastmannschaftName='([^']+)'",
+    "age_group": r"edMannschaftsartName='([^']+)'",
+    "league": r"edSpielklasseName='([^']+)'",
     "wettbewerb_name": r"edWettbewerbName='([^']+)'",
-    "wettbewerb_id":   r"edWettbewerbId='([^']+)'",
+    "wettbewerb_id": r"edWettbewerbId='([^']+)'",
 }
+
 
 def _extract_ed_vars(html: str) -> dict:
     out = {}
@@ -67,12 +83,17 @@ def _extract_ed_vars(html: str) -> dict:
             out[k] = m.group(1).strip()
     return out
 
+
 def _get_ok_html(url: str) -> Optional[str]:
     if not url:
         return None
-    with temp_headers(accept="text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                      **{"x-requested-with": None}, referer=BASE):
+    with temp_headers(
+        accept="text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        **{"x-requested-with": None},
+        referer=BASE,
+    ):
         return get_text(url, timeout=REQUEST_TIMEOUT, allow_redirects=True)
+
 
 def _extract_jsonld_event(soup: BeautifulSoup) -> Dict[str, Optional[str]]:
     out: Dict[str, Optional[str]] = {}
@@ -111,8 +132,11 @@ def _extract_jsonld_event(soup: BeautifulSoup) -> Dict[str, Optional[str]]:
 
             home = _team_name(node.get("homeTeam") or {})
             away = _team_name(node.get("awayTeam") or {})
-            if home: out["home"] = home
-            if away: out["away"] = away
+            if home:
+                out["home"] = home
+
+            if away:
+                out["away"] = away
 
             start = node.get("startDate")
             if start:
@@ -132,7 +156,10 @@ def _extract_jsonld_event(soup: BeautifulSoup) -> Dict[str, Optional[str]]:
             return out
     return out
 
-def fetch_match_details(spiel_link: str, use_cache: bool = USE_CACHE_DEFAULT) -> Dict[str, Optional[str]]:
+
+def fetch_match_details(
+    spiel_link: str, use_cache: bool = USE_CACHE_DEFAULT
+) -> Dict[str, Optional[str]]:
     url = abs_url(spiel_link or "")
     if not url:
         return {}
@@ -144,6 +171,7 @@ def fetch_match_details(spiel_link: str, use_cache: bool = USE_CACHE_DEFAULT) ->
     if use_cache:
         try:
             import os
+
             if os.path.exists(cache_file):
                 with open(cache_file, "r", encoding="utf-8") as f:
                     html = f.read()
@@ -184,30 +212,44 @@ def fetch_match_details(spiel_link: str, use_cache: bool = USE_CACHE_DEFAULT) ->
     staffelnummer = _find_dt_dd(r"^Staffel(?:\-|\s*)?nummer")
 
     if not spielnummer:
-        m = re.search(r"Spiel(?:\-|\s*)?nummer\s*[:\-]?\s*([A-Z0-9\-]+)", text, flags=re.I)
+        m = re.search(
+            r"Spiel(?:\-|\s*)?nummer\s*[:\-]?\s*([A-Z0-9\-]+)", text, flags=re.I
+        )
         if m:
             spielnummer = m.group(1).strip()
 
     if not staffelnummer:
-        m = re.search(r"Staffel(?:\-|\s*)?nummer\s*[:\-]?\s*([A-Z0-9\-]+)", text, flags=re.I)
+        m = re.search(
+            r"Staffel(?:\-|\s*)?nummer\s*[:\-]?\s*([A-Z0-9\-]+)", text, flags=re.I
+        )
         if m:
             staffelnummer = m.group(1).strip()
 
-    return {"spielnummer": spielnummer, "staffelnummer": staffelnummer, "staffel_id": staffel_id}
+    return {
+        "spielnummer": spielnummer,
+        "staffelnummer": staffelnummer,
+        "staffel_id": staffel_id,
+    }
 
-def fetch_match_full(match_link: str, use_cache: bool = USE_CACHE_DEFAULT) -> Dict[str, Optional[str]]:
+
+def fetch_match_full(
+    match_link: str, use_cache: bool = USE_CACHE_DEFAULT
+) -> Dict[str, Optional[str]]:
     url = abs_url(match_link or "")
     if not url:
         return {}
 
     m = game_id_IN_URL.search(url)
     sid_for_cache = (m.group(1) if m else re.sub(r"\W+", "_", url)) or "unknown"
-    cache_file = cache_path_for("match_full", f"full_{sid_for_cache}", CACHE_DIR) + ".html"
+    cache_file = (
+        cache_path_for("match_full", f"full_{sid_for_cache}", CACHE_DIR) + ".html"
+    )
 
     html = None
     if use_cache:
         try:
             import os
+
             if os.path.exists(cache_file):
                 with open(cache_file, "r", encoding="utf-8") as f:
                     html = f.read()
@@ -241,8 +283,12 @@ def fetch_match_full(match_link: str, use_cache: bool = USE_CACHE_DEFAULT) -> Di
 
     age_group = ed.get("age_group")
 
-    home = _text_or_none(soup.select_one(".stage .team-home .team-name a")) or ed.get("home")
-    away = _text_or_none(soup.select_one(".stage .team-away .team-name a")) or ed.get("away")
+    home = _text_or_none(soup.select_one(".stage .team-home .team-name a")) or ed.get(
+        "home"
+    )
+    away = _text_or_none(soup.select_one(".stage .team-away .team-name a")) or ed.get(
+        "away"
+    )
 
     staffel_id = None
     comp_a = soup.select_one(".stage .stage-header a.competition[href*='/-/staffel/']")
