@@ -5,6 +5,7 @@ VENV ?= venv
 PY := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
 UVICORN := $(VENV)/bin/uvicorn
+LINT := $(VENV)/bin/pylint
 RUFF := $(VENV)/bin/ruff
 BLACK := $(VENV)/bin/black
 PYTEST := $(VENV)/bin/pytest
@@ -26,8 +27,8 @@ help:
 	@echo "  run              Run API locally (uvicorn --reload)"
 	@echo "  dev              Alias for run"
 	@echo "  shell            Open interactive shell with venv activated"
-	@echo "  lint             Run ruff (linter)"
-	@echo "  format           Run black (formatter)"
+	@echo "  lint             Run ruff (analysis) + pylint"
+	@echo "  format           Run ruff format & check --fix"
 	@echo "  test             Run pytest"
 	@echo "  clean            Remove caches/build artifacts"
 	@echo "  docker-build     Build docker image ($(IMAGE))"
@@ -65,11 +66,15 @@ shell: venv
 # ===== QA =====
 .PHONY: lint
 lint: install
-	$(RUFF) check .
+	@status=0; \
+	$(VENV)/bin/ruff check . || status=$$?; \
+	$(VENV)/bin/pylint app tests || status=$$?; \
+	exit $$status
 
 .PHONY: format
 format: install
-	$(BLACK) .
+	$(RUFF) format .
+	$(RUFF) check . --fix
 
 .PHONY: test
 test: install

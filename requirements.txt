@@ -4,3 +4,5 @@ requests==2.32.3
 beautifulsoup4==4.12.3
 pydantic==2.9.1
 fonttools==4.53.1
+pylint==3.3.8
+ruff==0.13.2

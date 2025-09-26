@@ -1,3 +1,10 @@
+"""
+Configuration module for fussball.de scraping.
+
+Defines constants for base URLs, HTTP timeouts, sleep intervals,
+caching options, and user agent strings.
+"""
+
 import os
 
 # Base URL for fussball.de
@@ -16,5 +23,5 @@ USE_CACHE_DEFAULT: bool = os.getenv("USE_CACHE", "1") == "1"
 USER_AGENT: str = os.getenv(
     "USER_AGENT",
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
 )

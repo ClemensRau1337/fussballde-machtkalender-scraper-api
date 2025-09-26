@@ -1,10 +1,12 @@
 from typing import Optional
 from pydantic import BaseModel
 
+
 class PostalCode(BaseModel):
     postalCode: str
     city: str
     district: Optional[str] = None
+
 
 class MatchOverview(BaseModel):
     date_label: Optional[str] = None
@@ -16,6 +18,7 @@ class MatchOverview(BaseModel):
     score: Optional[str] = None
     game_id: Optional[str] = None
     link: Optional[str] = None
+
 
 class MatchDetail(MatchOverview):
     competition: Optional[str] = None

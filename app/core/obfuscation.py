@@ -8,7 +8,7 @@ try:
 except Exception:
     TTFont = None  # optional
 
-from ..config import BASE, REQUEST_TIMEOUT, CACHE_DIR, USE_CACHE_DEFAULT
+from ..config import BASE, REQUEST_TIMEOUT, CACHE_DIR
 from .http import get_text, temp_headers
 from .utils import cache_path_for
 
@@ -16,7 +16,10 @@ _OBF_CACHE: Dict[str, Dict[int, str]] = {}
 
 _ENTITY_HEX_RX = re.compile(r"&#x([0-9A-Fa-f]{4,6});")
 
-def _fetch_obfuscation_css(obf_id: str, css_tpl_url: str, use_cache: bool = True) -> Optional[str]:
+
+def _fetch_obfuscation_css(
+    obf_id: str, css_tpl_url: str, use_cache: bool = True
+) -> Optional[str]:
     url = (css_tpl_url or "").replace("%ID%", obf_id)
     if not url:
         return None
@@ -24,16 +27,22 @@ def _fetch_obfuscation_css(obf_id: str, css_tpl_url: str, use_cache: bool = True
     if use_cache:
         try:
             import os
+
             if os.path.exists(cache_file):
                 with open(cache_file, "r", encoding="utf-8") as f:
                     return f.read()
         except Exception:
             pass
     with temp_headers(accept="text/css,*/*;q=0.1", referer=BASE):
-        css = get_text(url if url.startswith("http") else ("https:" + url), timeout=REQUEST_TIMEOUT, allow_redirects=True)
+        css = get_text(
+            url if url.startswith("http") else ("https:" + url),
+            timeout=REQUEST_TIMEOUT,
+            allow_redirects=True,
+        )
     if css and use_cache:
         try:
             import os
+
             os.makedirs(os.path.dirname(cache_file), exist_ok=True)
             with open(cache_file, "w", encoding="utf-8") as f:
                 f.write(css)
@@ -41,16 +50,21 @@ def _fetch_obfuscation_css(obf_id: str, css_tpl_url: str, use_cache: bool = True
             pass
     return css
 
+
 def _build_obfuscation_map_from_css(css: str) -> Dict[int, str]:
     mapping: Dict[int, str] = {}
-    for m in re.finditer(r"\.c([0-9A-Fa-f]{4,6})::?before\s*{[^}]*content\s*:\s*['\"](.*?)['\"]", css):
+    for m in re.finditer(
+        r"\.c([0-9A-Fa-f]{4,6})::?before\s*{[^}]*content\s*:\s*['\"](.*?)['\"]", css
+    ):
         try:
             cp = int(m.group(1), 16)
             ch = m.group(2)[:1]
             mapping[cp] = ch
         except Exception:
             continue
-    for m in re.finditer(r'data-c=["\']([0-9A-Fa-f]{4,6})["\'][^{]+content\s*:\s*["\'](.*?)["\']', css):
+    for m in re.finditer(
+        r'data-c=["\']([0-9A-Fa-f]{4,6})["\'][^{]+content\s*:\s*["\'](.*?)["\']', css
+    ):
         try:
             cp = int(m.group(1), 16)
             ch = m.group(2)[:1]
@@ -59,12 +73,14 @@ def _build_obfuscation_map_from_css(css: str) -> Dict[int, str]:
             continue
     return mapping
 
+
 def _fetch_obfuscation_font(obf_id: str, use_cache: bool = True) -> Optional[bytes]:
     url = f"https://www.fussball.de/export.fontface/-/format/woff/id/{obf_id}/type/font"
     cache_file = cache_path_for("obfcss", f"{obf_id}.woff", CACHE_DIR) + ".woff"
     if use_cache:
         try:
             import os
+
             if os.path.exists(cache_file):
                 with open(cache_file, "rb") as f:
                     return f.read()
@@ -72,12 +88,14 @@ def _fetch_obfuscation_font(obf_id: str, use_cache: bool = True) -> Optional[byt
             pass
     with temp_headers(accept="font/woff,*/*;q=0.1", referer=BASE):
         import requests
+
         r = requests.get(url, timeout=REQUEST_TIMEOUT, allow_redirects=True)
         if r.status_code == 200 and r.content:
             data = r.content
             if use_cache:
                 try:
                     import os
+
                     os.makedirs(os.path.dirname(cache_file), exist_ok=True)
                     with open(cache_file, "wb") as f:
                         f.write(data)
@@ -85,6 +103,7 @@ def _fetch_obfuscation_font(obf_id: str, use_cache: bool = True) -> Optional[byt
                     pass
             return data
     return None
+
 
 def _build_obfuscation_map_from_font(woff_bytes: bytes) -> Dict[int, str]:
     mapping: Dict[int, str] = {}
@@ -94,7 +113,11 @@ def _build_obfuscation_map_from_font(woff_bytes: bytes) -> Dict[int, str]:
         font = TTFont(BytesIO(woff_bytes))
         cmap = font.getBestCmap() or {}
         for cp, glyph_name in cmap.items():
-            if isinstance(glyph_name, str) and glyph_name.startswith("uni") and len(glyph_name) == 7:
+            if (
+                isinstance(glyph_name, str)
+                and glyph_name.startswith("uni")
+                and len(glyph_name) == 7
+            ):
                 try:
                     real_cp = int(glyph_name[3:], 16)
                     mapping[cp] = chr(real_cp)
@@ -109,7 +132,10 @@ def _build_obfuscation_map_from_font(woff_bytes: bytes) -> Dict[int, str]:
         pass
     return mapping
 
-def _collect_obfuscation_maps_for_page(soup: BeautifulSoup, use_cache: bool = True) -> Dict[str, Dict[int, str]]:
+
+def _collect_obfuscation_maps_for_page(
+    soup: BeautifulSoup, use_cache: bool = True
+) -> Dict[str, Dict[int, str]]:
     maps: Dict[str, Dict[int, str]] = {}
     body = soup.find("body")
     css_tpl = body.get("data-obfuscation-stylesheet") if body else None
@@ -141,12 +167,15 @@ def _collect_obfuscation_maps_for_page(soup: BeautifulSoup, use_cache: bool = Tr
 
     return maps
 
+
 def _decode_obfuscated_text(raw_html_or_text: str, obf_map: Dict[int, str]) -> str:
     if not raw_html_or_text:
         return ""
+
     def _ent_repl(m):
         cp = int(m.group(1), 16)
         return obf_map.get(cp, "?")
+
     s = _ENTITY_HEX_RX.sub(_ent_repl, raw_html_or_text)
 
     def _map_chars(txt: str) -> str:
@@ -156,8 +185,9 @@ def _decode_obfuscated_text(raw_html_or_text: str, obf_map: Dict[int, str]) -> s
 
     s = _map_chars(s)
     s = BeautifulSoup(s, "html.parser").get_text(" ", strip=True)
-    import re
+
     return re.sub(r"\s+", " ", s).strip()
+
 
 def _find_ancestor_obf_id(node) -> Optional[str]:
     cur = getattr(node, "parent", None)
@@ -166,6 +196,7 @@ def _find_ancestor_obf_id(node) -> Optional[str]:
             return cur.get("data-obfuscation")
         cur = getattr(cur, "parent", None)
     return None
+
 
 def decode_all_obf_in(el, page_maps: Dict[str, Dict[int, str]]) -> str:
     pieces: List[str] = []
@@ -176,8 +207,10 @@ def decode_all_obf_in(el, page_maps: Dict[str, Dict[int, str]]) -> str:
         else:
             pieces.append(str(txt))
     out = "".join(pieces)
-    import re
+   
+
     return re.sub(r"\s+", " ", out).strip()
+
 
 __all__ = [
     "_collect_obfuscation_maps_for_page",
