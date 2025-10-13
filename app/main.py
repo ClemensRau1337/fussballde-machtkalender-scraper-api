@@ -1,34 +1,40 @@
 from typing import List
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.responses import RedirectResponse
+from fastapi.middleware.cors import CORSMiddleware  # 👈 You need this import!
+
 from .schemas import MatchOverview, PostalCode, MatchDetail
 from .core.postal import get_postal_codes
 from .core.calendar import collect_matches_for_area
 from .core.match import fetch_match_full
 
 app = FastAPI(
-    title="Fussball.de Matchkalender Scraper API (inoffiziell)", version="1.0.0"
+    title="Fussball.de Matchkalender Scraper API (inoffiziell)",
+    version="1.0.0"
 )
 
+# ✅ CORS Middleware — allows access from anywhere
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],          # Allow all domains (good for local dev)
+    allow_credentials=True,
+    allow_methods=["*"],          # Allow all HTTP methods
+    allow_headers=["*"],          # Allow all headers
+)
 
 @app.get("/", include_in_schema=False)
 async def root():
     return RedirectResponse(url="/docs")
 
-
 @app.get("/postal-codes", response_model=List[PostalCode])
 def postal_codes(
     query: str = Query(
-        description="PLZ/Ort-Query."
-        "Gib einen Ort ein und erhalte alle von fussball.de zugeordneten PLZs."
+        description="PLZ/Ort-Query. Gib einen Ort ein und erhalte alle von fussball.de zugeordneten PLZs."
     ),
 ):
     return get_postal_codes(query)
 
-
-@app.get(
-    "/matches", response_model=List[MatchOverview], response_model_exclude_none=True
-)
+@app.get("/matches", response_model=List[MatchOverview], response_model_exclude_none=True)
 def matches(
     from_: str = Query(..., alias="from", description="YYYY-MM-DD"),
     to: str = Query(..., description="YYYY-MM-DD"),
@@ -49,7 +55,6 @@ def matches(
         }
         for m in items
     ]
-
 
 @app.get("/match", response_model=MatchDetail, response_model_exclude_none=True)
 def match_by_link(
