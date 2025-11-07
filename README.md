@@ -156,6 +156,10 @@ make test
 make clean
 ```
 
+1. make docker-build
+2. docker tag fussballde-machtkalender-scraper-api:latest clemensrau/fussballde-machtkalender-scraper-api:latest
+3. docker push clemensrau/fussballde-machtkalender-scraper-api:latest
+
 
 ## Lizenz
 
